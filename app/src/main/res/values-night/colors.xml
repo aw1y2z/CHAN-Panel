@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 色板（深色） -->
+    <color name="brand">#E8465F</color>
+    <color name="brand_soft">#3A1C22</color>
+    <color name="app_bg">#0B0C0D</color>
+    <color name="surface">#16181A</color>
+    <color name="stroke">#2A2D33</color>
+    <color name="line_soft">#33FFFFFF</color>
+    <color name="txt_primary">#ECEFEE</color>
+    <color name="txt_secondary">#9BA4AC</color>
+    <color name="txt_tertiary">#8E98A2</color>
+    <color name="accent">#22C55E</color>
+    <color name="warn">#E0A03C</color>
+    <color name="info">#60A5FA</color>
+    <color name="purple">#A78BFA</color>
+    <color name="danger">#F87171</color>
+    <color name="float_bar">#1B1D20</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- 夜间：状态胶囊、头像底、车图占位线都要压低亮度 -->
+    <color name="pill_ok_bg">#15301F</color>
+    <color name="pill_warn_bg">#33260F</color>
+    <color name="pill_idle_bg">#23262C</color>
+    <color name="avatar_bg">#23282F</color>
+    <color name="placeholder_stroke">#343B46</color>
+</resources>

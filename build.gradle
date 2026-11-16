@@ -1,0 +1,5 @@
+// 顶层构建脚本：只声明插件版本，不在此应用。
+// AGP 9 起 Kotlin 支持已内置，无需单独 apply kotlin 插件（与 mishopAssistant 同一套已验证工具链）。
+plugins {
+    id 'com.android.application' version '9.2.1' apply false
+}

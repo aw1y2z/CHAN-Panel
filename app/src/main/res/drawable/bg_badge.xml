@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 未读数角标：红底圆角，最小高度由文案撑开 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/brand" />
+    <corners android:radius="9dp" />
+</shape>

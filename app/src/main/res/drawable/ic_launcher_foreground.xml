@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  图标前景：分节扫描环 + 方向盘（浅底版）。
+
+  白底上不能靠发亮取胜，改用结构制造科技感：
+  外环拆 4 段、缺口留节点、内圈一条极细参考环，主体是细线描边的方向盘。
+  深墨蓝打底，只有右上段与中心点走品牌红做视觉落点。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 外环 · 右上段：品牌红，唯一强调色 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,25 A29,29 0 0,1 79.11,39.5"
+        android:strokeColor="#E8465F"
+        android:strokeLineCap="round"
+        android:strokeWidth="3.2" />
+
+    <!-- 外环 · 右下段：弱化 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M83,54 A29,29 0 0,1 68.5,79.11"
+        android:strokeColor="#B4BECD"
+        android:strokeLineCap="round"
+        android:strokeWidth="3.2" />
+
+    <!-- 外环 · 左下段：深墨主色 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,83 A29,29 0 0,1 28.89,68.5"
+        android:strokeColor="#16202E"
+        android:strokeLineCap="round"
+        android:strokeWidth="3.2" />
+
+    <!-- 外环 · 左上段：弱化 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M25,54 A29,29 0 0,1 39.5,28.89"
+        android:strokeColor="#B4BECD"
+        android:strokeLineCap="round"
+        android:strokeWidth="3.2" />
+
+    <!-- 内圈参考环：极细，制造纵深 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,34 a20,20 0 1,0 0,40 a20,20 0 1,0 0,-40"
+        android:strokeColor="#1A16202E"
+        android:strokeWidth="1" />
+
+    <!-- 端点节点：缺口处各一枚，右上那枚亮红 -->
+    <path
+        android:fillColor="#E8465F"
+        android:pathData="M80.11,46.49 a2.1,2.1 0 1,1 4.2,0 a2.1,2.1 0 1,1 -4.2,0" />
+    <path
+        android:fillColor="#8C16202E"
+        android:pathData="M59.61,82.01 a2.1,2.1 0 1,1 4.2,0 a2.1,2.1 0 1,1 -4.2,0" />
+    <path
+        android:fillColor="#16202E"
+        android:pathData="M22.29,61.51 a2.1,2.1 0 1,1 4.2,0 a2.1,2.1 0 1,1 -4.2,0" />
+    <path
+        android:fillColor="#8C16202E"
+        android:pathData="M44.19,25.59 a2.1,2.1 0 1,1 4.2,0 a2.1,2.1 0 1,1 -4.2,0" />
+
+    <!-- 方向盘外圈 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M41,54 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0"
+        android:strokeColor="#16202E"
+        android:strokeWidth="2.8" />
+
+    <!-- 三根辐条 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,54 L44.5,54"
+        android:strokeColor="#16202E"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.8" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,54 L63.5,54"
+        android:strokeColor="#16202E"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.8" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,54 L54,63.5"
+        android:strokeColor="#16202E"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.8" />
+
+    <!-- 中心点：唯一实心，落点在这里 -->
+    <path
+        android:fillColor="#E8465F"
+        android:pathData="M49.5,54 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0" />
+</vector>

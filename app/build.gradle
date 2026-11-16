@@ -1,0 +1,68 @@
+// 本工程无 Compose / Miuix，纯 View 体系，AGP 9 内置 Kotlin 直接编译 .kt 源码。
+apply plugin: 'com.android.application'
+
+// 逆向得到的客户端凭据不写进仓库，统一从 local.properties 读取。
+// 文件缺失时为空串：编译照常通过，只是登录会失败，方便别人 clone 后自行填写。
+def localProps = new Properties()
+def localFile = rootProject.file('local.properties')
+if (localFile.exists()) {
+    localFile.withInputStream { localProps.load(it) }
+}
+def changanClientId = localProps.getProperty('changan.clientId', '')
+def changanClientSecret = localProps.getProperty('changan.clientSecret', '')
+def xiaoanClientId = localProps.getProperty('xiaoan.clientId', '')
+
+android {
+    namespace 'io.github.aw1y2z.changan'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId "io.github.aw1y2z.changan"
+        minSdk 26
+        //noinspection ExpiredTargetSdkVersion
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+
+        buildConfigField "String", "CHANGAN_CLIENT_ID", "\"${changanClientId}\""
+        buildConfigField "String", "CHANGAN_CLIENT_SECRET", "\"${changanClientSecret}\""
+        buildConfigField "String", "XIAOAN_CLIENT_ID", "\"${xiaoanClientId}\""
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // 没配正式签名时用 debug 签名，保证 assembleRelease 出来的包能直接装
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    // 控车页功能块网格（支持长按拖拽排序）
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+
+    // 网络栈：OkHttp 4.x + 协程
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+
+    // 后台安全守护巡检（15 分钟一次拉车况）
+    implementation 'androidx.work:work-runtime-ktx:2.10.0'
+}

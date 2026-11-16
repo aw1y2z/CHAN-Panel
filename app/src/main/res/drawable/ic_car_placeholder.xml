@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 车图占位：真实车型图由 /app2/api/resource/list?pubCode=CARPNG 按 carId 下发，不做硬编码 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="140dp"
+    android:viewportWidth="320"
+    android:viewportHeight="140">
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42,96 L58,70 Q64,58 80,56 L124,50 Q150,34 186,34 L222,38 Q246,42 258,58 L272,68 Q284,74 286,88 L286,96"
+        android:strokeColor="@color/placeholder_stroke"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42,96 L286,96"
+        android:strokeColor="@color/placeholder_stroke"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M104,96 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0"
+        android:strokeColor="@color/placeholder_stroke"
+        android:strokeWidth="3" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M204,96 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0"
+        android:strokeColor="@color/placeholder_stroke"
+        android:strokeWidth="3" />
+</vector>

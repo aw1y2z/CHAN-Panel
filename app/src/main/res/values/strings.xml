@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CHAN-Panel</string>
+    <string name="hint_account">手机号</string>
+    <string name="hint_password">密码</string>
+    <string name="btn_login">登录</string>
+    <string name="login_todo">协议未接入：登录流程需要先完成真机抓包/脱壳（见 docs/api-notes.md）</string>
+    <string name="status_not_ready">车况协议未接入</string>
+    <string name="control_not_ready">控车协议未接入</string>
+</resources>

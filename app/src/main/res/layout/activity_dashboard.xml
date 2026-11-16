@@ -1,0 +1,646 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/app_bg">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ScrollView
+            android:id="@+id/contentScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="14dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="104dp">
+
+            <!-- 顶部：车名 + 在线状态 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvCarName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="长安汽车"
+                    android:textColor="@color/txt_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvOnline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:includeFontPadding="false"
+                    android:text="● 在线"
+                    android:textColor="@color/brand"
+                    android:textSize="11sp" />
+
+                <ImageView
+                    android:id="@+id/btnRefresh"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="刷新"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_c_refresh"
+                    android:tint="@color/txt_secondary" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvUpdated"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="--:-- 更新"
+                android:textColor="@color/txt_secondary"
+                android:textSize="11sp" />
+
+            <!-- 车辆示意图 -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="118dp"
+                android:layout_marginTop="2dp">
+
+                <ImageView
+                    android:id="@+id/ivCar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="车辆"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_car_placeholder" />
+            </FrameLayout>
+
+            <!-- ================= 仪表盘页 ================= -->
+            <LinearLayout
+                android:id="@+id/pageStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- 一行两格：续航 + 油量，都是「还能跑多远」的决策信息 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout style="@style/MiniStatCard">
+
+                        <TextView
+                            android:id="@+id/tvLabelRange"
+                            style="@style/MiniStatLabel"
+                            android:text="续航" />
+
+                        <TextView
+                            android:id="@+id/tvRange"
+                            style="@style/MiniStatValueBig"
+                            android:layout_marginTop="3dp"
+                            android:text="--" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        style="@style/MiniStatCard"
+                        android:layout_marginStart="7dp">
+
+                        <TextView
+                            android:id="@+id/tvLabelFuel"
+                            style="@style/MiniStatLabel"
+                            android:text="油量" />
+
+                        <TextView
+                            android:id="@+id/tvFuel"
+                            style="@style/MiniStatValueBig"
+                            android:layout_marginTop="3dp"
+                            android:text="--" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- 2×5 车况网格：异常值标橙 -->
+                <LinearLayout
+                    android:id="@+id/cardStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="车辆状态"
+                        android:textColor="@color/txt_secondary"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="车锁" />
+
+                            <TextView
+                                android:id="@+id/tvStLock"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="车门" />
+
+                            <TextView
+                                android:id="@+id/tvStDoor"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="车窗" />
+
+                            <TextView
+                                android:id="@+id/tvStWindow"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="天窗" />
+
+                            <TextView
+                                android:id="@+id/tvStSunroof"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="后备箱" />
+
+                            <TextView
+                                android:id="@+id/tvStTrunk"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="引擎盖" />
+
+                            <TextView
+                                android:id="@+id/tvStHood"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="空调" />
+
+                            <TextView
+                                android:id="@+id/tvStAc"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="电瓶" />
+
+                            <TextView
+                                android:id="@+id/tvStBattery"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="前胎压" />
+
+                            <TextView
+                                android:id="@+id/tvStTyreF"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="后胎压" />
+
+                            <TextView
+                                android:id="@+id/tvStTyreR"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="PM2.5" />
+
+                            <TextView
+                                android:id="@+id/tvStPm25"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                style="@style/StLabel"
+                                android:layout_width="wrap_content"
+                                android:text="车内 / 车外" />
+
+                            <TextView
+                                android:id="@+id/tvStInTemp"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="总里程" />
+
+                            <TextView
+                                android:id="@+id/tvStOdometer"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="油耗" />
+
+                            <TextView
+                                android:id="@+id/tvStFuelEco"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="钥匙" />
+
+                            <TextView
+                                android:id="@+id/tvStKey"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <TextView style="@style/StLabel" android:text="水温" />
+
+                            <TextView
+                                android:id="@+id/tvStWater"
+                                style="@style/StValue"
+                                android:text="--" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- 车辆位置 -->
+                <LinearLayout
+                    android:id="@+id/cardLocation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:contentDescription="位置"
+                            android:src="@drawable/ic_c_location"
+                            android:tint="@color/brand" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:text="车辆位置"
+                            android:textColor="@color/txt_secondary"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tvLocNav"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="查看地图 ›"
+                            android:textColor="@color/brand"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvAddress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="4dp"
+                        android:text="获取中…"
+                        android:textColor="@color/txt_primary"
+                        android:textIsSelectable="true"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvLocMeta"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="--"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ================= 控车页 ================= -->
+            <LinearLayout
+                android:id="@+id/pageControl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- 车锁 / 发动机 / 车窗现状：点「关」之前先确认有没有必要 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/pillLock"
+                        style="@style/StatusPill"
+                        android:text="车锁 --" />
+
+                    <TextView
+                        android:id="@+id/pillEngine"
+                        style="@style/StatusPill"
+                        android:layout_marginStart="8dp"
+                        android:text="发动机 --" />
+
+                    <TextView
+                        android:id="@+id/pillWindow"
+                        style="@style/StatusPill"
+                        android:layout_marginStart="8dp"
+                        android:text="车窗 --" />
+                </LinearLayout>
+
+
+                <!-- 编辑态提示条：点它退出编辑 -->
+                <TextView
+                    android:id="@+id/tvEditBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_card"
+                    android:gravity="center"
+                    android:text="拖动排序 · 点右上角调宽度 · 点此完成"
+                    android:textColor="@color/brand"
+                    android:textSize="11.5sp"
+                    android:visibility="gone" />
+
+                <!-- 功能块网格：长按可拖拽排序，顺序存在本机 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvControl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:overScrollMode="never"
+                    android:nestedScrollingEnabled="false" />
+            </LinearLayout>
+        </LinearLayout>
+        </ScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- 「我的」页：和仪表盘/控车同层显隐，切换没有 Activity 转场动画 -->
+    <include
+        android:id="@+id/pageMine"
+        layout="@layout/view_mine"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 底部浮动导航 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="22dp"
+        android:layout_marginEnd="22dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_nav"
+        android:elevation="10dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/navStatus"
+            style="@style/NavItem">
+
+            <ImageView
+                android:id="@+id/navStatusIcon"
+                style="@style/NavIcon"
+                android:contentDescription="仪表盘"
+                android:src="@drawable/ic_c_nav_home" />
+
+            <TextView
+                android:id="@+id/navStatusLabel"
+                style="@style/NavLabel"
+                android:text="仪表盘" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navControl"
+            style="@style/NavItem">
+
+            <ImageView
+                android:id="@+id/navControlIcon"
+                style="@style/NavIcon"
+                android:contentDescription="控车"
+                android:src="@drawable/ic_c_nav_car" />
+
+            <TextView
+                android:id="@+id/navControlLabel"
+                style="@style/NavLabel"
+                android:text="控车" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navMine"
+            style="@style/NavItem">
+
+            <ImageView
+                android:id="@+id/navMineIcon"
+                style="@style/NavIcon"
+                android:contentDescription="我的"
+                android:src="@drawable/ic_c_nav_mine" />
+
+            <TextView
+                android:id="@+id/navMineLabel"
+                style="@style/NavLabel"
+                android:text="我的" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  图标底色：白→浅冷灰的斜向渐变。
+  纯白在浅色壁纸上会糊掉边界，收一点点冷灰就够了，整体仍然是「亮底」。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#FFFFFF"
+                android:centerColor="#F7F9FC"
+                android:endColor="#E8EDF5" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.22"
+                android:centerY="0.16"
+                android:gradientRadius="76dp"
+                android:startColor="#1A4FD1FF"
+                android:endColor="#004FD1FF" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  控车页的空调卡片。放进网格里当一个整行的 item，这样它能和功能块一起拖拽排序。
+  控件 id 与原来保持一致，Activity 通过 adapter 回调操作。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/airCard"
+    android:layout_width="match_parent"
+    android:layout_height="72dp"
+    android:layout_margin="4dp"
+    android:background="@drawable/bg_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp">
+
+    <ImageView
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:contentDescription="空调"
+        android:src="@drawable/ic_c_fan"
+        android:tint="@color/txt_tertiary" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvAcMinus"
+                android:layout_width="38dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="−"
+                android:textColor="@color/txt_primary"
+                android:textSize="21sp" />
+
+            <TextView
+                android:id="@+id/tvAcTemp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="58dp"
+                android:text="22°C"
+                android:textColor="@color/txt_primary"
+                android:textSize="21sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvAcPlus"
+                android:layout_width="38dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="+"
+                android:textColor="@color/txt_primary"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvAcNow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="38dp"
+            android:includeFontPadding="false"
+            android:text="空调 --"
+            android:textColor="@color/txt_tertiary"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvAcApply"
+        android:layout_width="wrap_content"
+        android:layout_height="34dp"
+        android:background="@drawable/bg_btn_brand"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="开空调"
+        android:textColor="@color/white"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tvAcOff"
+        android:layout_width="wrap_content"
+        android:layout_height="34dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_btn_outline"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="关空调"
+        android:textColor="@color/txt_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

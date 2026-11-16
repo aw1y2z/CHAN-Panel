@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 色板（浅色） -->
+    <color name="brand">#E8465F</color>
+    <color name="brand_soft">#FBE9EC</color>
+    <color name="app_bg">#F7F8FB</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="stroke">#EDEFF3</color>
+    <color name="line_soft">#22000000</color>
+    <color name="txt_primary">#111217</color>
+    <color name="txt_secondary">#6E7787</color>
+    <color name="txt_tertiary">#7C8695</color>
+    <color name="accent">#22C55E</color>
+    <color name="warn">#E0A03C</color>
+    <color name="info">#2563EB</color>
+    <color name="purple">#7C3AED</color>
+    <color name="danger">#DC2626</color>
+    <color name="float_bar">#FFFFFF</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- 需要夜间反转的浅底，单独抽出来给 values-night 覆盖 -->
+    <color name="pill_ok_bg">#E9F7EF</color>
+    <color name="pill_warn_bg">#FDF1E0</color>
+    <color name="pill_idle_bg">#F1F3F7</color>
+    <color name="avatar_bg">#E6EBF2</color>
+    <color name="placeholder_stroke">#D3DBE6</color>
+</resources>

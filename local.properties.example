@@ -1,0 +1,15 @@
+# 复制为 local.properties 后填写（该文件已被 .gitignore 排除，不会进仓库）
+#
+# 这一项是可选的：代码里已内置可用的默认凭据，clone 后直接能构建登录。
+# 只有默认值失效（官方调整）时，才需要在这里填新的覆盖。
+#
+#   changan.*  「引力域」全功能通道（扫码登录、车控、消息中心）
+#   xiaoan.*   「小安控车」小程序手机号通道（只有部分车控指令）
+
+# Android SDK 路径（Android Studio 一般会自动写）
+# sdk.dir=C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
+
+# 留空 = 使用代码内置的默认值
+changan.clientId=
+changan.clientSecret=
+xiaoan.clientId=

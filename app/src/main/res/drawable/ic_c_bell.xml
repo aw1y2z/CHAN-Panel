@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 信息中心入口图标：铃铛，24dp 线稿，靠 tint 上色 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,22a2,2 0 0,0 2,-2h-4a2,2 0 0,0 2,2Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M18,16.2v-5.2a6,6 0 0,0 -5,-5.91V4a1,1 0 0,0 -2,0v1.09A6,6 0 0,0 6,11v5.2l-1.71,1.71A1,1 0 0,0 5,19.5h14a1,1 0 0,0 0.71,-1.71Z M8,11c0,-2.21 1.79,-4 4,-4s4,1.79 4,4v4.5H8Z" />
+</vector>
