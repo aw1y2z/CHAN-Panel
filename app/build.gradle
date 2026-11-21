@@ -12,6 +12,14 @@ def changanClientId = localProps.getProperty('changan.clientId', '')
 def changanClientSecret = localProps.getProperty('changan.clientSecret', '')
 def xiaoanClientId = localProps.getProperty('xiaoan.clientId', '')
 
+// release 签名同样从本地配置读：仓库里不放 keystore，也不放密码。
+// 缺失时自动回退 debug 签名，保证别人 clone 后仍能构建 release。
+def releaseStoreFile = localProps.getProperty('release.storeFile', '')
+def releaseStorePwd = localProps.getProperty('release.storePassword', '')
+def releaseKeyAlias = localProps.getProperty('release.keyAlias', '')
+def releaseKeyPwd = localProps.getProperty('release.keyPassword', '')
+def hasReleaseKey = releaseStoreFile && releaseStorePwd && releaseKeyAlias
+
 android {
     namespace 'io.github.aw1y2z.changan'
     compileSdk 37
@@ -33,13 +41,24 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("releaseSign") {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePwd
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPwd
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // 没配正式签名时用 debug 签名，保证 assembleRelease 出来的包能直接装
-            signingConfig signingConfigs.debug
+            // 有正式密钥就用它，否则回退 debug 签名（保证别人 clone 后仍能打 release）
+            signingConfig hasReleaseKey ? signingConfigs.releaseSign : signingConfigs.debug
         }
     }
 
@@ -65,4 +84,7 @@ dependencies {
 
     // 后台安全守护巡检（15 分钟一次拉车况）
     implementation 'androidx.work:work-runtime-ktx:2.10.0'
+
+    // MQTT：mqtt 协议车型的车况只能通过 MQTT 推送获取
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
 }

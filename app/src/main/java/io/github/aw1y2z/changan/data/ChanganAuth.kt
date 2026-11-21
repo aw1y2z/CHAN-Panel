@@ -80,21 +80,28 @@ object ChanganAuth {
      *
      * @return true 表示已拿到 VCS token
      */
-    fun authorizeByXiaoanToken(): Boolean {
+    fun authorizeByXiaoanToken(): Boolean = authorizeByXiaoanTokenDetail() == null
+
+    /**
+     * 同 [authorizeByXiaoanToken]，但失败时返回原因，便于界面提示。
+     * @return null 表示成功
+     */
+    fun authorizeByXiaoanTokenDetail(): String? {
         val mToken = TokenStore.xiaoanToken
-        if (mToken.isEmpty()) return false
+        if (mToken.isEmpty()) return "缺少手机号登录凭证"
         return runCatching {
             val (qid, _) = requestQrCode()
-            if (qid.isEmpty()) return@runCatching false
+            if (qid.isEmpty()) return@runCatching "获取授权二维码失败"
             val resp = ChanganClient.postPlainFormAt(
                 INCALL_HOST,
                 "/oauth/api/qrcode/authorize",
                 mapOf("token" to mToken, "qrcodeId" to qid),
             )
             val code = JSONObject(resp).optString("data")
-            if (code.isEmpty()) return@runCatching false
-            exchangeToken(code)
-        }.getOrDefault(false)
+            if (code.isEmpty()) return@runCatching "授权码换取失败"
+            if (!exchangeToken(code)) return@runCatching "授权令牌换取失败"
+            null
+        }.getOrElse { it.message ?: "授权异常" }
     }
 
     /** 第 3 步：authorized_code 换 token */
@@ -140,17 +147,76 @@ object ChanganAuth {
         return TokenStore.hasToken
     }
 
-    /** 车辆列表：POST /open/api/v1.0/car/getList → [{carId, vin, ...}] */
+    /**
+     * 车辆列表。
+     *
+     * 手表 1.1 换成了 `GET /openc-apigw/baseMeta/api/v1/car/getCarListByBrandCode?brandCode=CHANGAN`，
+     * 响应 `code==0`、`data` 是车辆数组；旧接口 `POST /open/api/v1.0/car/getList` 对部分车型
+     * 不返回（这就是“有些车型拿不到车列表”的原因）。这里以新接口为主，失败再回退旧接口。
+     */
     fun fetchCars(): org.json.JSONArray {
-        val resp = ChanganClient.postFormSigned(
+        val resp = runCatching {
+            ChanganClient.getVcsWithToken(
+                "/openc-apigw/baseMeta/api/v1/car/getCarListByBrandCode",
+                mapOf("brandCode" to "CHANGAN"),
+            )
+        }.getOrNull()
+
+        if (!resp.isNullOrEmpty()) {
+            val root = runCatching { JSONObject(resp) }.getOrNull()
+            if (root != null && root.optInt("code", -1) == 0) {
+                return root.optJSONArray("data") ?: org.json.JSONArray()
+            }
+        }
+
+        val fallback = ChanganClient.postFormSigned(
             "/open/api/v1.0/car/getList",
             mapOf("accessToken" to TokenStore.accessToken, "pageSize" to 10, "pageIndex" to 1),
         )
-        val root = JSONObject(resp)
+        val root = JSONObject(fallback)
         if (root.optInt("statusCode", -1) != 0) {
             throw IllegalStateException("车辆列表失败：${root.optString("msg")}")
         }
         return root.optJSONArray("data") ?: org.json.JSONArray()
+    }
+
+    /**
+     * 车辆协议类型：GET /openc-apigw/vot-api-server/api/v1/product/getProtocolTypeByCarId
+     *
+     * 不同车型的协议版本不一样，取车况前先用它判断，避免在小程序通道上拿到空数据。
+     */
+    fun fetchProtocolType(carId: String): String {
+        val resp = runCatching {
+            ChanganClient.getVcs(
+                "/openc-apigw/vot-api-server/api/v1/product/getProtocolTypeByCarId",
+                mapOf("carId" to carId),
+            )
+        }.getOrNull().orEmpty()
+        if (resp.isEmpty()) return ""
+        val root = runCatching { JSONObject(resp) }.getOrNull() ?: return ""
+        return when (val d = root.opt("data")) {
+            null -> ""
+            is String -> d
+            is Number -> d.toString()
+            is JSONObject -> d.optString("protocolType")
+                .ifEmpty { d.optString("protocolVer") }
+                .ifEmpty { d.optString("type") }
+            else -> d.toString()
+        }
+    }
+
+    /** 用户信息：POST /open/api/v1.0/user/getUserInfo → data.userId（安全守护消息的 trackUserId） */
+    fun fetchOfficialUserId(): String {
+        val resp = runCatching {
+            ChanganClient.postFormSigned(
+                "/open/api/v1.0/user/getUserInfo",
+                mapOf("accessToken" to TokenStore.accessToken),
+            )
+        }.getOrNull() ?: return ""
+        val root = runCatching { JSONObject(resp) }.getOrNull() ?: return ""
+        val userId = root.optJSONObject("data")?.optString("userId").orEmpty()
+        if (userId.isNotEmpty()) TokenStore.officialUserId = userId
+        return userId
     }
 
     /** 车辆详情：GET /openc-apigw/bdc/api/v1/car/get-carInfo-use-carId?carId= */

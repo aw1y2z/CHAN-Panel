@@ -23,6 +23,8 @@
 
 项目内置了可用的默认凭据，**clone 后无需任何配置即可构建登录**。若官方调整导致登录失败，可把 `local.properties.example` 复制成 `local.properties`，用其中的 `changan.clientId` / `changan.clientSecret` / `xiaoan.clientId` 覆盖默认值。
 
+**签名**：`local.properties` 里配了 `release.storeFile` / `release.storePassword` / `release.keyAlias` / `release.keyPassword` 就用正式密钥，否则回退 debug 签名。仓库不含 keystore。注意 debug 签名与正式签名不能互相覆盖安装，换签名前需要卸载。
+
 本仓库不带 `gradlew`（工具链由本机提供），Windows 下构建：
 
 ```

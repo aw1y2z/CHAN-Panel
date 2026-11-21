@@ -128,59 +128,234 @@
                 android:layout_marginTop="8dp"
                 android:orientation="vertical" />
 
-            <!-- 信息中心：安全守护 / 点熄火 的本机消息 -->
+            <!-- 消息中心：区块标题与「我的车辆」同级，两行与「设置」项同款 -->
             <LinearLayout
-                android:id="@+id/rowInfoCenter"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_card"
-                android:clickable="true"
-                android:focusable="true"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <ImageView
-                    android:layout_width="19dp"
-                    android:layout_height="19dp"
-                    android:contentDescription="信息中心"
-                    android:src="@drawable/ic_c_bell"
-                    android:tint="@color/txt_secondary" />
+                android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
                     android:layout_weight="1"
-                    android:text="信息中心"
-                    android:textColor="@color/txt_primary"
-                    android:textSize="14sp" />
+                    android:text="消息中心"
+                    android:textColor="@color/txt_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <LinearLayout
+                    android:id="@+id/rowMsgControl"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="点火熄火"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvControlUnread"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <LinearLayout
+                    android:id="@+id/rowMsgSecurity"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="安全守护"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvSecurityUnread"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 车辆数据：行车轨迹 / 全景照片 / 操作记录 / 控车码管理 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tvInfoUnread"
-                    android:layout_width="wrap_content"
-                    android:layout_height="18dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_badge"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:minWidth="18dp"
-                    android:paddingStart="5dp"
-                    android:paddingEnd="5dp"
-                    android:textColor="#FFFFFF"
-                    android:textSize="10sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:includeFontPadding="false"
-                    android:text="›"
-                    android:textColor="@color/txt_tertiary"
-                    android:textSize="18sp" />
+                    android:layout_weight="1"
+                    android:text="车辆数据"
+                    android:textColor="@color/txt_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <LinearLayout
+                    android:id="@+id/rowDriving"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="行车轨迹"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="›"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <LinearLayout
+                    android:id="@+id/rowMedia"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="全景照片"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="›"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <LinearLayout
+                    android:id="@+id/rowOperation"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="操作记录"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="›"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <LinearLayout
+                    android:id="@+id/rowControlPin"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="控车码管理"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="›"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="18sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- 设置项 -->
@@ -215,6 +390,37 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="跟随系统"
+                        android:textColor="@color/txt_tertiary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <LinearLayout
+                    android:id="@+id/rowProtocol"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="控车协议"
+                        android:textColor="@color/txt_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvProtocolValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="自动"
                         android:textColor="@color/txt_tertiary"
                         android:textSize="12sp" />
                 </LinearLayout>

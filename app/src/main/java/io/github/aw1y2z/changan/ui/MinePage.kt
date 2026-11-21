@@ -62,7 +62,9 @@ class MinePage(
     private val tvAccount: TextView = root.findViewById(R.id.tvAccount)
     private val tvAccountSub: TextView = root.findViewById(R.id.tvAccountSub)
     private val tvThemeValue: TextView = root.findViewById(R.id.tvThemeValue)
-    private val tvInfoUnread: TextView = root.findViewById(R.id.tvInfoUnread)
+    private val tvProtocolValue: TextView = root.findViewById(R.id.tvProtocolValue)
+    private val tvControlUnread: TextView = root.findViewById(R.id.tvControlUnread)
+    private val tvSecurityUnread: TextView = root.findViewById(R.id.tvSecurityUnread)
 
     // ---- 头像三态：相册图 > 本机生成的彩色数字 > 占位图标 ----
 
@@ -100,10 +102,33 @@ class MinePage(
             loadCars(force = true)
         }
         root.findViewById<View>(R.id.rowTheme).setOnClickListener { pickTheme() }
+        root.findViewById<View>(R.id.rowProtocol).setOnClickListener { pickProtocol() }
         root.findViewById<View>(R.id.rowAbout).setOnClickListener { showAbout() }
         root.findViewById<View>(R.id.btnLogout).setOnClickListener { logout() }
-        root.findViewById<View>(R.id.rowInfoCenter).setOnClickListener {
-            activity.startActivity(Intent(activity, InfoCenterActivity::class.java))
+        // 消息中心拆两列：点火熄火（APP-CONTROL）/ 安全守护（APP-SECURITY）
+        root.findViewById<View>(R.id.rowMsgControl).setOnClickListener {
+            activity.startActivity(
+                Intent(activity, InfoCenterActivity::class.java).putExtra("type", "control"),
+            )
+        }
+        root.findViewById<View>(R.id.rowMsgSecurity).setOnClickListener {
+            activity.startActivity(
+                Intent(activity, InfoCenterActivity::class.java).putExtra("type", "security"),
+            )
+        }
+
+        // 车辆数据：行车轨迹 / 全景照片 / 操作记录 / 控车码管理
+        root.findViewById<View>(R.id.rowDriving).setOnClickListener {
+            openVehicleData(VehicleDataActivity.MODE_DRIVING)
+        }
+        root.findViewById<View>(R.id.rowMedia).setOnClickListener {
+            openVehicleData(VehicleDataActivity.MODE_MEDIA)
+        }
+        root.findViewById<View>(R.id.rowOperation).setOnClickListener {
+            openVehicleData(VehicleDataActivity.MODE_RECORDS)
+        }
+        root.findViewById<View>(R.id.rowControlPin).setOnClickListener {
+            openVehicleData(VehicleDataActivity.MODE_PIN)
         }
         avatarBox.setOnClickListener { pickAvatarSource() }
 
@@ -112,19 +137,35 @@ class MinePage(
         }.getOrNull().orEmpty().ifEmpty { "1.0" }
 
         renderTheme()
+        renderProtocol()
         renderAvatar()
     }
 
-    /** 信息中心未读数：角标只是提示，读不到就当 0 */
+    private fun openVehicleData(mode: String) {
+        activity.startActivity(
+            Intent(activity, VehicleDataActivity::class.java)
+                .putExtra(VehicleDataActivity.EXTRA_MODE, mode),
+        )
+    }
+
+    /** 消息中心两个角标：点火熄火 / 安全守护，各自统计本机未读 */
     fun refreshInfoBadge() {
         scope.launch {
-            val n = withContext(Dispatchers.IO) { InfoCenter.unreadCount(activity) }
-            if (n <= 0) {
-                tvInfoUnread.visibility = View.GONE
-            } else {
-                tvInfoUnread.visibility = View.VISIBLE
-                tvInfoUnread.text = if (n > 99) "99+" else n.toString()
+            val counts = withContext(Dispatchers.IO) {
+                InfoCenter.unreadCount(activity, InfoCenter.KIND_IGNITION) to
+                    InfoCenter.unreadCount(activity, InfoCenter.KIND_SAFETY)
             }
+            bindBadge(tvControlUnread, counts.first)
+            bindBadge(tvSecurityUnread, counts.second)
+        }
+    }
+
+    private fun bindBadge(tv: TextView, n: Int) {
+        if (n <= 0) {
+            tv.visibility = View.GONE
+        } else {
+            tv.visibility = View.VISIBLE
+            tv.text = if (n > 99) "99+" else n.toString()
         }
     }
 
@@ -490,6 +531,42 @@ class MinePage(
 
     private fun renderTheme() {
         tvThemeValue.text = themeLabel(TokenStore.nightMode)
+    }
+
+    private fun renderProtocol() {
+        tvProtocolValue.text = protocolLabel(TokenStore.controlProtocol)
+    }
+
+    private fun protocolLabel(p: String): String = when (p) {
+        "open" -> "公共协议"
+        "v3" -> "V3"
+        "v5" -> "V5"
+        else -> "自动"
+    }
+
+    /**
+     * 控车协议：自动 / 公共协议 / V3 / V5。
+     *
+     * 自动模式会依次尝试，成功一次就记住，下次优先走该协议。
+     * 不同车型支持的协议不同，遇到指令下发失败可以先手动指定再试。
+     */
+    private fun pickProtocol() {
+        val values = arrayOf("auto", "open", "v3", "v5")
+        val labels = arrayOf("自动（依次尝试）", "公共协议", "V3", "V5")
+        val checked = values.indexOf(TokenStore.controlProtocol).coerceAtLeast(0)
+        MaterialAlertDialogBuilder(activity)
+            .setTitle("控车协议")
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                dialog.dismiss()
+                val v = values[which]
+                if (v == TokenStore.controlProtocol) return@setSingleChoiceItems
+                TokenStore.controlProtocol = v
+                // 切换协议后清掉上次的命中记录，避免沿用旧结果
+                TokenStore.lastOkProtocol = ""
+                renderProtocol()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun themeLabel(mode: Int): String = when (mode) {

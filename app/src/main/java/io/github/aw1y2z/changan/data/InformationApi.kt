@@ -20,6 +20,16 @@ object InformationApi {
 
     /** 分类过滤值：空串=全部 */
     const val TYPE_ALL = ""
+
+    /**
+     * 手表 1.1 消息中心实际用的两个数据源（`trunkFullPath` 前缀级过滤）：
+     *  - 点熄火：`APP-CONTROL`，`trackUserId` 用账号 uid
+     *  - 安全守护：`APP-SECURITY`，`trackUserId` 用 userInfo 里的 userId
+     */
+    const val TYPE_CONTROL = "APP-CONTROL"
+    const val TYPE_SECURITY = "APP-SECURITY"
+
+    // 旧细分值保留，供历史调用点使用
     const val TYPE_FLAMEOUT = "APP-CONTROL-FLAMEOUT"
     const val TYPE_IGNITION = "APP-CONTROL-IGNITION"
     const val TYPE_GUARD = "APP-GUARD-SMART_GUARD"
@@ -49,10 +59,13 @@ object InformationApi {
         startLength: Int = 0,
         displayLength: Int = 20,
         trunkFullPath: String = TYPE_ALL,
+        trackUserId: String = TokenStore.userId,
     ): Page {
+        // 手表 1.1 的请求体还带 realReceiverId=carId，少了它服务端只返回空页
         val form = mapOf(
             "actionType" to 1,
-            "trackUserId" to TokenStore.userId,
+            "trackUserId" to trackUserId,
+            "realReceiverId" to TokenStore.carId,
             "trunkFullPath" to trunkFullPath,
             "startLength" to startLength,
             "displayLength" to displayLength,

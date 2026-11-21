@@ -67,6 +67,10 @@ object InfoCenter {
 
     fun unreadCount(ctx: Context): Int = messages(ctx).count { !it.read }
 
+    /** 按类别统计未读（点火熄火 / 安全守护各自的角标） */
+    fun unreadCount(ctx: Context, kind: String): Int =
+        messages(ctx).count { !it.read && it.kind == kind }
+
     fun markAllRead(ctx: Context) {
         synchronized(this) {
             val root = load(ctx)

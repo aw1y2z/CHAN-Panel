@@ -6,6 +6,7 @@ import android.util.Log
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -59,12 +60,53 @@ object XiaoanApi {
         return exec(builder().url(BASE + path).post(body))
     }
 
-    private fun exec(rb: Request.Builder): String =
-        http.newCall(rb.build()).execute().use { resp ->
+    private fun doExec(req: okhttp3.Request): String =
+        http.newCall(req).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             Log.i("Changan", "XIAOAN ${resp.code} ${resp.request.url} -> ${text.take(400)}")
             text
         }
+
+    private fun isTokenExpired(body: String): Boolean =
+        body.contains("\"code\":401") ||
+            body.contains("\"code\":40001") ||
+            body.contains("token expired") ||
+            body.contains("token not exists")
+
+    /** token 失效时自动刷新一次并重放（替换 body/query 里的 token 字段） */
+    private fun exec(rb: Request.Builder): String {
+        val built = rb.build()
+        val first = doExec(built)
+        if (!isTokenExpired(first) || TokenStore.xiaoanRefreshToken.isEmpty()) return first
+        if (!refreshToken()) return first
+
+        val body = built.body as? FormBody
+        val retried: okhttp3.Request = if (body != null) {
+            val nb = FormBody.Builder()
+            var changed = false
+            for (i in 0 until body.size) {
+                val name = body.name(i)
+                if (name == "token") {
+                    nb.add(name, TokenStore.xiaoanToken)
+                    changed = true
+                } else {
+                    nb.add(name, body.value(i))
+                }
+            }
+            if (changed) {
+                okhttp3.Request.Builder().url(built.url).post(nb.build()).headers(built.headers).build()
+            } else {
+                val ub = built.url.newBuilder()
+                built.url.queryParameterNames.forEach { if (it == "token") ub.setQueryParameter(it, TokenStore.xiaoanToken) }
+                okhttp3.Request.Builder().url(ub.build()).headers(built.headers).build()
+            }
+        } else {
+            val ub = built.url.newBuilder()
+            built.url.queryParameterNames.forEach { if (it == "token") ub.setQueryParameter(it, TokenStore.xiaoanToken) }
+            okhttp3.Request.Builder().url(ub.build()).headers(built.headers).build()
+        }
+        return doExec(retried)
+    }
 
     /** 公共参数：token / isNev / type */
     private fun baseParams(): MutableMap<String, String> = mutableMapOf(
@@ -105,6 +147,9 @@ object XiaoanApi {
         TokenStore.xiaoanToken = data.optString("token")
         TokenStore.xiaoanRefreshToken = data.optString("refreshToken")
         TokenStore.xiaoanUserId = data.optString("userId")
+        val exp = data.optLong("expiresIn", 0L).takeIf { it > 0 }
+            ?: data.optLong("expires_in", 3600L)
+        TokenStore.xiaoanTokenExpireAt = System.currentTimeMillis() / 1000 + exp
         if (TokenStore.xiaoanToken.isEmpty()) throw IllegalStateException("未取得 token")
         // 顺手用这个 m.iov token 自助完成 OAuth 授权：成功后同时持有 VCS token，
         // 控车就走 open.iov 全功能通道（不需要扫码、也不需要控车码）。
@@ -112,15 +157,38 @@ object XiaoanApi {
         return data
     }
 
-    /** 刷新小程序 token：GET /cac/api/v1/oauth2/refresh_token */
+    /** 发 GET 但不触发 token 自动刷新（供刷新接口自身使用，避免递归） */
+    private fun rawGet(path: String, query: Map<String, String>): String {
+        val url = buildString {
+            append(BASE).append(path)
+            if (query.isNotEmpty()) {
+                append('?')
+                append(query.entries.joinToString("&") {
+                    "${it.key}=${java.net.URLEncoder.encode(it.value, "UTF-8")}"
+                })
+            }
+        }
+        return doExec(builder().url(url).get().build())
+    }
+
+    /**
+     * 刷新小程序 token：GET /cac/api/v1/oauth2/refresh_token
+     *
+     * `refresh_token` 是一次性的，多个请求同时过期会互相顶掉（后一次的返回值覆盖前一次，
+     * 先发的请求就失效了），所以这里加锁串行化。
+     */
+    @Synchronized
     fun refreshToken(): Boolean {
         val q = baseParams().apply { put("refresh_token", TokenStore.xiaoanRefreshToken) }
         q["client_id"] = BuildConfig.XIAOAN_CLIENT_ID.ifEmpty { DEFAULT_CLIENT_ID }
-        val root = runCatching { JSONObject(get("/cac/api/v1/oauth2/refresh_token", q)) }.getOrNull() ?: return false
+        val root = runCatching { JSONObject(rawGet("/cac/api/v1/oauth2/refresh_token", q)) }
+            .getOrNull() ?: return false
         val token = root.optString("access_token")
         if (token.isEmpty()) return false
         TokenStore.xiaoanToken = token
         root.optString("refresh_token").takeIf { it.isNotEmpty() }?.let { TokenStore.xiaoanRefreshToken = it }
+        TokenStore.xiaoanTokenExpireAt =
+            System.currentTimeMillis() / 1000 + root.optLong("expires_in", 3600)
         return true
     }
 
@@ -163,6 +231,10 @@ object XiaoanApi {
             put("keys", "*")
         }
         val root = JSONObject(post("/app2/api/car/data", form))
+        val code = root.optInt("code", -1)
+        if (code != 0) {
+            throw IllegalStateException(root.optString("msg").ifEmpty { "车况查询失败($code)" })
+        }
         return root.optJSONObject("data") ?: JSONObject()
     }
 
@@ -229,12 +301,21 @@ object XiaoanApi {
         else -> null
     }
 
-    /** 取 RSA 公钥（每次现取，服务端可能轮换） */
-    private fun fetchPublicKey(): java.security.PublicKey? {
-        val root = runCatching {
-            JSONObject(get("/app2/api/v2/security/key", baseParams()))
-        }.getOrNull() ?: return null
-        val b64 = root.optString("data")
+    /**
+     * 取 RSA 公钥（每次现取，服务端可能轮换）。
+     *
+     * 必须带 `carId`，否则偶尔返回空 `data`；首次请求可能命中 token 刷新而拿不到值，故重试一次。
+     */
+    private fun fetchPublicKey(carId: String = ""): java.security.PublicKey? {
+        val q = baseParams().apply { if (carId.isNotEmpty()) put("carId", carId) }
+        var b64 = ""
+        for (attempt in 0 until 2) {
+            b64 = runCatching {
+                JSONObject(get("/app2/api/v2/security/key", q))
+            }.getOrNull()?.optString("data").orEmpty()
+            if (b64.isNotEmpty()) break
+            if (attempt == 0) Thread.sleep(300)
+        }
         if (b64.isEmpty()) return null
         return runCatching {
             val der = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
@@ -271,37 +352,98 @@ object XiaoanApi {
 
     /** 下发控车指令（阻塞，需在工作线程调用） */
     fun executeControl(carId: String, pin: String, cmd: XiaoanCmd): ControlOutcome {
-        if (pin.isEmpty()) return ControlOutcome(false, "请先填写控车码")
-        val pub = fetchPublicKey() ?: return ControlOutcome(false, "获取加密公钥失败，请重试")
-        val pv = createPinVerifyCode()
-        if (pv.isEmpty()) return ControlOutcome(false, "获取控车校验码失败，请重试")
-
         val plain = JSONObject()
-            .put("pin", pin)
             .put("cmd", cmd.code)
             .put("type", "0")
             .put("notifyTuType", "0")
-            .put("pinVerifyCode", pv)
-            .toString()
-        val s = runCatching { encryptOaep(pub, plain) }
-            .getOrElse { return ControlOutcome(false, "指令加密失败：${it.message}") }
+        return sendByProtocol(carId, pin, plain, "「${cmd.label}」指令已下发")
+    }
 
-        val form = baseParams().apply {
-            put("carId", carId)
-            put("s", s)
+    /** 当前设置下的协议尝试顺序：手动指定只试一个，自动则优先上次成功的 */
+    private fun protocolOrder(): List<String> = when (TokenStore.controlProtocol) {
+        "open" -> listOf("open")
+        "v3" -> listOf("v3")
+        "v5" -> listOf("v5")
+        else -> {
+            val last = TokenStore.lastOkProtocol
+            (listOfNotNull(last.takeIf { it.isNotEmpty() }) + listOf("v3", "v5", "open")).distinct()
         }
-        val root = runCatching { JSONObject(post("/app2/api/v3/control/execute", form)) }
+    }
+
+    /**
+     * 按协议下发指令。
+     *
+     * 三种协议只在端点和凭证上有区别：
+     *  - open：`/app2/api/control/execute`，控车码 + pinVerifyCode；
+     *  - v3：`/app2/api/v3/control/execute`，同上；
+     *  - v5：`/app2/api/v5/control/execute`，表单还需 `pinToken`。
+     *
+     * 自动模式依次尝试，成功即记住，下次优先走它。
+     */
+    private fun sendByProtocol(
+        carId: String,
+        pin: String,
+        plainBase: JSONObject,
+        okMsg: String,
+    ): ControlOutcome {
+        if (pin.isEmpty()) return ControlOutcome(false, "请先填写控车码")
+        val pub = fetchPublicKey(carId) ?: return ControlOutcome(false, "获取加密公钥失败，请重试")
+
+        val auto = TokenStore.controlProtocol == "auto"
+        var lastMsg = ""
+        for (proto in protocolOrder()) {
+            val r = tryProtocol(proto, carId, pin, pub, plainBase, okMsg)
+            if (r.ok) {
+                TokenStore.lastOkProtocol = proto
+                return r
+            }
+            lastMsg = r.message
+            if (!auto) break
+        }
+        return ControlOutcome(false, lastMsg.ifEmpty { "指令下发失败" })
+    }
+
+    private fun tryProtocol(
+        proto: String,
+        carId: String,
+        pin: String,
+        pub: java.security.PublicKey,
+        plainBase: JSONObject,
+        okMsg: String,
+    ): ControlOutcome {
+        val form = baseParams().apply { put("carId", carId) }
+        if (proto == "v5") {
+            val pt = fetchPinToken(carId)
+            if (pt.isEmpty()) return ControlOutcome(false, "缺少控车令牌，无法走 V5 协议")
+            form["pinToken"] = pt
+        }
+
+        val pv = createPinVerifyCode()
+        if (pv.isEmpty()) return ControlOutcome(false, "获取控车校验码失败，请重试")
+
+        val plain = JSONObject(plainBase.toString())
+            .put("pin", pin)
+            .put("pinVerifyCode", pv)
+        val s = runCatching { encryptOaep(pub, plain.toString()) }
+            .getOrElse { return ControlOutcome(false, "指令加密失败：${it.message}") }
+        form["s"] = s
+
+        val path = when (proto) {
+            "open" -> "/app2/api/control/execute"
+            "v5" -> "/app2/api/v5/control/execute"
+            else -> "/app2/api/v3/control/execute"
+        }
+        val root = runCatching { JSONObject(post(path, form)) }
             .getOrNull() ?: return ControlOutcome(false, "网络异常，指令未下发")
 
         val code = root.optInt("code", -1)
         if (code != 0) {
             val text = when (code) {
-                21 -> "控车码错误，请重新填写"
+                3, 21 -> "控车码错误，请重新填写"
                 else -> root.optString("msg").ifEmpty { "指令下发失败($code)" }
             }
             return ControlOutcome(false, text)
         }
-
         val data = root.opt("data")
         val taskId = when (data) {
             is JSONObject -> data.optString("taskId").ifEmpty { data.optString("id") }
@@ -309,7 +451,7 @@ object XiaoanApi {
             else -> ""
         }
         val requestId = (data as? JSONObject)?.optString("requestId").orEmpty()
-        return ControlOutcome(true, "「${cmd.label}」指令已下发", taskId, requestId)
+        return ControlOutcome(true, okMsg, taskId, requestId)
     }
 
     /**
@@ -392,5 +534,296 @@ object XiaoanApi {
             cacheFile.writeBytes(bytes)
             true
         }.getOrDefault(false)
+    }
+
+    // ============ 行车轨迹 / 全景照片 / 控车码状态 ============
+
+    /** 一段行程（/app2/api/driving 的原始字段） */
+    data class Trip(
+        val id: String,
+        val startTime: String,
+        val endTime: String,
+        val startAddr: String,
+        val endAddr: String,
+        val mileage: Double,
+        val minutes: Double,
+        val avgSpeed: Double,
+        val score: Int,
+    )
+
+    /**
+     * 行车轨迹：GET /app2/api/driving?carId=&token=&startDate=&endDate=
+     *
+     * `startDate`/`endDate` 都是 `yyyy-MM-dd`，**两个都必填**（缺一个服务端回 40005）。
+     */
+    fun fetchDrivingHistory(carId: String, startDate: String, endDate: String): List<Trip> {
+        val q = baseParams().apply {
+            put("carId", carId)
+            put("startDate", startDate)
+            put("endDate", endDate)
+        }
+        val root = JSONObject(get("/app2/api/driving", q))
+        if (root.optInt("code", -1) != 0) {
+            throw IllegalStateException(root.optString("msg").ifEmpty { "行车轨迹拉取失败" })
+        }
+        val arr = root.optJSONArray("data") ?: return emptyList()
+        val out = ArrayList<Trip>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            out += Trip(
+                id = o.optString("drivingHistoryId"),
+                startTime = o.optString("startTime"),
+                endTime = o.optString("endTime"),
+                startAddr = o.optString("startAddressName"),
+                endAddr = o.optString("endAddressName"),
+                mileage = o.optDouble("mileage", 0.0),
+                minutes = o.optDouble("spendTime", 0.0),
+                avgSpeed = o.optDouble("avrgSpeed", 0.0),
+                score = o.optInt("score", 0),
+            )
+        }
+        return out
+    }
+
+    /**
+     * 一张全景照片。
+     *
+     * 服务端字段：`thumbnail`（https 缩略图）、`url`（**http** 原图，需换 https）、
+     * `time`、`name`、`task_id`（同一次拍摄的 4 张共用）、`id`。
+     */
+    data class MediaFile(
+        val id: String,
+        val url: String,
+        val thumb: String,
+        val time: String,
+        val name: String,
+        val taskId: String,
+    )
+
+    /**
+     * 全景照片：GET /appserver/api/file/getMediaFilesByUserIdAndCarId
+     *
+     * 参数名是 **`page`**（不是 `pageIndex`），且必须带 `fileType=1`；
+     * 缺 `fileType` 时服务端返回空数组而非报错。
+     * 一次拍摄产生 4 张（前/后/左/右），它们的 `task_id` 相同。
+     */
+    fun fetchMediaFiles(carId: String, page: Int = 1, pageSize: Int = 30): List<MediaFile> {
+        val q = baseParams().apply {
+            put("userId", TokenStore.xiaoanUserId.ifEmpty { TokenStore.userId })
+            put("carId", carId)
+            put("page", page.toString())
+            put("pageSize", pageSize.toString())
+            put("fileType", "1")
+        }
+        val root = JSONObject(get("/appserver/api/file/getMediaFilesByUserIdAndCarId", q))
+        if (root.optInt("code", -1) != 0) {
+            throw IllegalStateException(root.optString("msg").ifEmpty { "照片拉取失败" })
+        }
+        val arr = root.optJSONArray("data") ?: return emptyList()
+        val out = ArrayList<MediaFile>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val raw = o.optString("url").ifEmpty { o.optString("thumbnail") }
+            if (!raw.startsWith("http")) continue
+            // 原图地址是 http，App 关闭了明文流量，统一换成 https（CDN 支持）
+            val full = raw.replaceFirst("http://", "https://")
+            val thumb = o.optString("thumbnail").let {
+                if (it.startsWith("http")) it.replaceFirst("http://", "https://") else full
+            }
+            out += MediaFile(
+                id = o.optString("id"),
+                url = full,
+                thumb = thumb,
+                time = o.optString("time"),
+                name = o.optString("name"),
+                taskId = o.optString("task_id"),
+            )
+        }
+        return out
+    }
+
+    /** 账号是否已设置控车码：GET /app2/api/v2/pin/get-pin-set?carId= → data.pinSwitch */
+    fun fetchPinSwitch(carId: String): Boolean {
+        val q = baseParams().apply { put("carId", carId) }
+        val root = runCatching { JSONObject(get("/app2/api/v2/pin/get-pin-set", q)) }.getOrNull() ?: return false
+        return root.optJSONObject("data")?.optBoolean("pinSwitch", false) ?: false
+    }
+
+    // ============ 远程操作记录 ============
+
+    /** 一条远控记录 */
+    data class ActionRecord(
+        val id: String,
+        /** 原始指令名，如 LockDoor / OpenAir / photograph */
+        val cmd: String,
+        /** 中文指令名 */
+        val label: String,
+        /** Completed / RunFailure / Timeout … */
+        val status: String,
+        val ok: Boolean,
+        val result: String,
+        val sendTime: String,
+        val finishTime: String,
+        val user: String,
+    )
+
+    private val CMD_LABELS = mapOf(
+        "LockDoor" to "锁车",
+        "UnLockDoor" to "解锁",
+        "OpenWindow" to "打开车窗",
+        "CloseWindow" to "关闭车窗",
+        "WindowSlit" to "车窗留缝",
+        "OpenAir" to "打开空调",
+        "CloseAir" to "关闭空调",
+        "OpenEngine" to "启动引擎",
+        "CloseEngine" to "熄火",
+        "FlashLight" to "闪灯",
+        "Whistle" to "鸣笛",
+        "RemoteSearchCar" to "寻车",
+        "OpenTrunk" to "打开后备箱",
+        "CloseTrunk" to "关闭后备箱",
+        "OpenDormer" to "打开天窗",
+        "CloseDormer" to "关闭天窗",
+        "takePhoto" to "远程拍照",
+        "photograph" to "360 全景拍摄",
+    )
+
+    private val STATUS_LABELS = mapOf(
+        "Completed" to "成功",
+        "RunFailure" to "失败",
+        "Timeout" to "超时",
+        "Sended" to "已下发",
+    )
+
+    /**
+     * 远程操作记录：`POST https://incallapi.changan.com.cn/appserver/api/car/getControlActionHistory`
+     *
+     * 注意两点：
+     *  1. **必须是 POST**（空的 body 即可），GET 会返回 500「内部服务器错误」；
+     *  2. 参数全在 query 上：`carId / pageSize / page / startTime / endTime /
+     *     toast / ErrorAutoProjectile / token / isNev`，`page` 从 0 开始，
+     *     时间是 `yyyy-MM-dd HH:mm:ss`。
+     */
+    fun fetchControlActionHistory(
+        carId: String,
+        days: Int = 365,
+        pageSize: Int = 50,
+        page: Int = 0,
+    ): List<ActionRecord> {
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        val now = System.currentTimeMillis()
+        val endText = fmt.format(java.util.Date(now))
+        val startText = fmt.format(java.util.Date(now - days.toLong() * 24 * 3600 * 1000))
+
+        fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
+        val url = buildString {
+            append("https://incallapi.changan.com.cn/appserver/api/car/getControlActionHistory")
+            append("?carId=").append(enc(carId))
+            append("&pageSize=").append(pageSize)
+            append("&page=").append(page)
+            append("&startTime=").append(enc(startText))
+            append("&endTime=").append(enc(endText))
+            append("&toast=false&ErrorAutoProjectile=false")
+            append("&token=").append(enc(TokenStore.xiaoanToken))
+            append("&isNev=0")
+        }
+
+        val body = runCatching {
+            val req = Request.Builder().url(url)
+                .header("vcs-app-id", "inCall")
+                .header("charset", "utf-8")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .header("User-Agent", UA)
+                .post(ByteArray(0).toRequestBody(null))
+                .build()
+            http.newCall(req).execute().use { it.body?.string().orEmpty() }
+        }.getOrElse { throw IllegalStateException(it.message ?: "网络异常") }
+
+        if (body.contains("token expired")) throw IllegalStateException("登录状态已过期，请重新登录")
+        val root = runCatching { JSONObject(body) }.getOrNull()
+            ?: throw IllegalStateException("返回格式异常")
+        if (root.optInt("code", -1) != 0) {
+            throw IllegalStateException(root.optString("msg").ifEmpty { "操作记录拉取失败" })
+        }
+        val arr = root.optJSONObject("data")?.optJSONArray("data") ?: return emptyList()
+        val out = ArrayList<ActionRecord>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val cmd = o.optString("tboxCmd")
+            val status = o.optString("handleStatus")
+            out += ActionRecord(
+                id = o.optString("cmdLogId"),
+                cmd = cmd,
+                // 服务端没解析出指令名时会回 "0"，这种按未知处理
+                label = CMD_LABELS[cmd] ?: cmd.takeIf { it.isNotEmpty() && it != "0" } ?: "未知指令",
+                status = STATUS_LABELS[status] ?: status,
+                ok = status == "Completed",
+                result = o.optString("resultDesc"),
+                sendTime = o.optString("cmdSendTime"),
+                finishTime = o.optString("cmdFinishTime"),
+                user = o.optString("userName"),
+            )
+        }
+        return out
+    }
+
+    // ============ 远程拍照（360 全景） ============
+
+    /**
+     * 远程拍照（360 全景）。
+     *
+     * 复用控车的 v3 链路（控车码 + pinVerifyCode），只换加密体内容：
+     *  - `type` = "photograph"：**指令名必须放在 type 里**，
+     *    放进 `cmd` 会被服务端记为「未知指令」，车端不执行；
+     *  - `cmd` = "0"，其余字段与锁车一致。
+     */
+    fun photograph(carId: String, pin: String): ControlOutcome {
+        val plain = JSONObject()
+            .put("cmd", "0")
+            .put("type", "photograph")
+            .put("notifyTuType", "0")
+        return sendByProtocol(carId, pin, plain, "拍照指令已下发，约 30 秒后可刷新查看")
+    }
+
+    /**
+     * 长期控车令牌，V5 协议需要它。
+     *
+     * 服务端会把 token 回填进每条远控记录的 `cmdParams`，所以从最近的记录里取即可，
+     * 不需要再让用户输入一次控车码。
+     */
+    fun fetchPinToken(carId: String): String {
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        val now = System.currentTimeMillis()
+        fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
+        val url = buildString {
+            append("https://incallapi.changan.com.cn/appserver/api/car/getControlActionHistory")
+            append("?carId=").append(enc(carId))
+            append("&pageSize=30&page=0")
+            append("&startTime=").append(enc(fmt.format(java.util.Date(now - 365L * 24 * 3600 * 1000))))
+            append("&endTime=").append(enc(fmt.format(java.util.Date(now))))
+            append("&toast=false&ErrorAutoProjectile=false")
+            append("&token=").append(enc(TokenStore.xiaoanToken))
+            append("&isNev=0")
+        }
+        val body = runCatching {
+            val req = Request.Builder().url(url)
+                .header("vcs-app-id", "inCall")
+                .header("charset", "utf-8")
+                .header("User-Agent", UA)
+                .post(ByteArray(0).toRequestBody(null))
+                .build()
+            http.newCall(req).execute().use { it.body?.string().orEmpty() }
+        }.getOrNull() ?: return ""
+        val arr = runCatching { JSONObject(body).optJSONObject("data")?.optJSONArray("data") }
+            .getOrNull() ?: return ""
+        for (i in 0 until arr.length()) {
+            val cp = arr.optJSONObject(i)?.optString("cmdParams").orEmpty()
+            if (!cp.contains("pinToken")) continue
+            val t = runCatching {
+                JSONObject(cp).optJSONObject("cmdParams")?.optString("pinToken")
+            }.getOrNull()
+            if (!t.isNullOrEmpty()) return t
+        }
+        return ""
     }
 }

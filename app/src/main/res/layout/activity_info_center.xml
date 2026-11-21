@@ -23,11 +23,12 @@
             android:textSize="26sp" />
 
         <TextView
+            android:id="@+id/tvTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:letterSpacing="0.02"
-            android:text="信息中心"
+            android:text="消息中心"
             android:textColor="@color/txt_primary"
             android:textSize="17sp"
             android:textStyle="bold" />

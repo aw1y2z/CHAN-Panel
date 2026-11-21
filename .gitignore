@@ -9,6 +9,11 @@ captures/
 # 本地配置：含逆向得到的客户端凭据与 SDK 路径，模板见 local.properties.example
 local.properties
 
+# 签名文件：密码同样在 local.properties 里，绝不入库
+*.jks
+*.keystore
+*.p12
+
 # 逆向产物与抓包：体积大，且含第三方资源和个人数据
 /re/
 /tools/

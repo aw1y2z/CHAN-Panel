@@ -13,11 +13,13 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.github.aw1y2z.changan.R
+import io.github.aw1y2z.changan.BuildConfig
 import io.github.aw1y2z.changan.data.ChanganAuth
 import io.github.aw1y2z.changan.data.ControlAction
 import io.github.aw1y2z.changan.data.ControlActions
 import io.github.aw1y2z.changan.data.DeviceId
 import io.github.aw1y2z.changan.data.InfoCenter
+import io.github.aw1y2z.changan.data.MqttCarStatus
 import io.github.aw1y2z.changan.data.NotifyCenter
 import io.github.aw1y2z.changan.data.SafetyCheck
 import io.github.aw1y2z.changan.data.TokenStore
@@ -187,9 +189,46 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun currentCarId(): String = TokenStore.xiaoanCarId.ifEmpty { TokenStore.carId }
 
+    /**
+     * 尝试 MQTT 车况通道。成功则直接渲染并返回 true。
+     *
+     * 只有 mqtt 协议车型（REST 车况返回空 `params` 的那种）才会有数据。
+     */
+    private suspend fun tryMqttStatus(carId: String): Boolean {
+        tvUpdated.text = "正在通过实时推送通道获取…"
+        val pushed = withContext(Dispatchers.IO) {
+            runCatching { MqttCarStatus.fetchStatus(carId, this@DashboardActivity) }.getOrNull()
+        }
+        if (pushed == null || pushed.length() == 0) return false
+        renderStatus(pushed, force = true)
+        refreshLocation(pushed)
+        tvUpdated.text = "${pushed.optString("terminalTime").ifEmpty { "--:--" }} 更新 · 实时推送"
+        return true
+    }
+
+    /** 调试入口：单独跑一次 MQTT 车况通道 */
+    private fun testMqttChannel() {
+        Toast.makeText(this, "测试 MQTT 通道…", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            val r = withContext(Dispatchers.IO) {
+                runCatching { MqttCarStatus.fetchStatus(TokenStore.carId, this@DashboardActivity) }.getOrNull()
+            }
+            Toast.makeText(
+                this@DashboardActivity,
+                if (r == null) "MQTT 未取到数据（看 Logcat MqttCarStatus）"
+                else "MQTT 成功：${r.length()} 个字段",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
     private fun bindViews() {
         tvCarName = findViewById(R.id.tvCarName)
         tvOnline = findViewById(R.id.tvOnline)
+        // 调试构建下点按右上角状态可单独测一次 MQTT 车况通道
+        if (BuildConfig.DEBUG) {
+            tvOnline.setOnClickListener { testMqttChannel() }
+        }
         tvUpdated = findViewById(R.id.tvUpdated)
         tvRange = findViewById(R.id.tvRange)
         tvFuel = findViewById(R.id.tvFuel)
@@ -355,13 +394,26 @@ class DashboardActivity : AppCompatActivity() {
         if (showTip) Toast.makeText(this, "正在刷新车况…", Toast.LENGTH_SHORT).show()
         scope.launch {
             try {
+                // 小程序 token 临近过期时先刷新一次，避免首屏请求必然失败再重试；
+                // 未记录过期时间的老数据（值为 0）也会走到这里补一次
+                if (TokenStore.hasXiaoan) {
+                    val left = TokenStore.xiaoanTokenExpireAt - System.currentTimeMillis() / 1000
+                    if (left < 300) withContext(Dispatchers.IO) { XiaoanApi.refreshToken() }
+                }
                 // 老用户升级：已有手机号 token 但还没有 VCS token 时，先补一次免扫码授权，
                 // 成功就直接走全功能通道。
                 if (!TokenStore.hasToken && TokenStore.hasXiaoan) {
-                    val ok = withContext(Dispatchers.IO) { ChanganAuth.authorizeByXiaoanToken() }
-                    if (ok) {
+                    val err = withContext(Dispatchers.IO) { ChanganAuth.authorizeByXiaoanTokenDetail() }
+                    if (err == null) {
                         applyChannelCapability()
                         Toast.makeText(this@DashboardActivity, "已获取全功能通道", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // 授权失败会让车况退化到手机号通道，部分车型取不到数据，必须提示
+                        Toast.makeText(
+                            this@DashboardActivity,
+                            "全功能通道获取失败：$err",
+                            Toast.LENGTH_LONG,
+                        ).show()
                     }
                 }
                 if (TokenStore.hasToken) {
@@ -396,9 +448,35 @@ class DashboardActivity : AppCompatActivity() {
         }
         tvCarName.text = TokenStore.displayNameOf(TokenStore.carId, TokenStore.carVin)
 
-        val status: JSONObject = withContext(Dispatchers.IO) { ControlActions.fetchStatus().getOrThrow() }
-        renderStatus(status)
-        refreshLocation(status)
+        val res = withContext(Dispatchers.IO) {
+            runCatching { ControlActions.fetchStatus().getOrThrow() }
+        }
+        val status = res.getOrNull()
+        if (status != null && status.length() > 0) {
+            renderStatus(status)
+            refreshLocation(status)
+            return
+        }
+        // 扫码通道拿不到车况时，回退手机号通道，避免不同协议车型直接空白
+        // 取车况失败时把协议版本一并带出来：不同车型协议不同，小程序通道不一定支持
+        val protocol = withContext(Dispatchers.IO) {
+            runCatching { ChanganAuth.fetchProtocolType(TokenStore.carId) }.getOrDefault("")
+        }
+        val reason = res.exceptionOrNull()?.message.orEmpty()
+        android.util.Log.i(
+            "Changan",
+            "VCS 车况失败 carId=${TokenStore.carId} reason=$reason protocol=$protocol",
+        )
+        // 没有手机号通道时直接试 MQTT，避免「VCS 失败就结束」
+        if (TokenStore.xiaoanToken.isEmpty()) {
+            if (tryMqttStatus(TokenStore.carId)) return
+            tvOnline.text = "● 离线"
+            tvUpdated.text = "车况读取失败：$reason"
+            return
+        }
+        refreshViaXiaoan(
+            if (protocol.isEmpty()) reason else "$reason，协议 $protocol",
+        )
     }
 
     /**
@@ -406,7 +484,12 @@ class DashboardActivity : AppCompatActivity() {
      * `/app2/api/car/data` 返回的就是**实时车况**（字段与 open.iov 一一对应），
      * 所以手机号登录同样能看完整车况、车图，并用控车码下发指令。
      */
-    private suspend fun refreshViaXiaoan() {
+    private suspend fun refreshViaXiaoan(vcsReason: String = "") {
+        if (TokenStore.xiaoanToken.isEmpty()) {
+            tvOnline.text = "● 离线"
+            tvUpdated.text = "车况读取失败：" + vcsReason.ifEmpty { "未登录小安通道" }
+            return
+        }
         if (TokenStore.xiaoanCarId.isEmpty()) {
             val cars: JSONArray = withContext(Dispatchers.IO) { XiaoanApi.fetchCars() }
             if (cars.length() == 0) {
@@ -429,8 +512,15 @@ class DashboardActivity : AppCompatActivity() {
         }
         val status = statusRes.getOrNull()
         if (status == null || status.length() == 0) {
+            // REST 两条通道都拿不到：最后试 MQTT 实时推送（mqtt 协议车型只走这个）
+            if (tryMqttStatus(carId)) return
             tvOnline.text = "● 离线"
-            tvUpdated.text = "车况读取失败：" + (statusRes.exceptionOrNull()?.message ?: "返回空数据")
+            val err = statusRes.exceptionOrNull()?.message
+            tvUpdated.text = when {
+                err == null -> "该车型车况需实时推送，暂未取到数据"
+                vcsReason.isNotEmpty() -> "车况读取失败：$err（扫码通道：$vcsReason）"
+                else -> "车况读取失败：$err"
+            }
             return
         }
         renderStatus(status)
@@ -443,7 +533,8 @@ class DashboardActivity : AppCompatActivity() {
         if (TokenStore.hasToken) {
             runCatching {
                 val s: JSONObject = withContext(Dispatchers.IO) { ControlActions.fetchStatus().getOrThrow() }
-                renderStatus(s)
+                // 控车后强制重绘：状态可能刚变，不能因为标识相同就跳过
+                renderStatus(s, force = true)
                 refreshLocation(s)
             }
             return
@@ -593,7 +684,18 @@ class DashboardActivity : AppCompatActivity() {
         false
     }
 
-    private fun renderStatus(status: JSONObject) {
+    /** 上次渲染用的车况标识，用于判断车端是否真的上报了新数据 */
+    private var lastStatusKey = ""
+
+    private fun renderStatus(status: JSONObject, force: Boolean = false) {
+        // `terminalTime` + `requestId` 都没变，说明车端没有新上报：
+        // 跳过重绘可避免界面闪动，也不会重复往信息中心推同一条异常
+        val key = status.optString("terminalTime") + "|" + status.optString("requestId")
+        if (!force && key.length > 1 && key == lastStatusKey) {
+            tvOnline.text = "● 在线"
+            return
+        }
+        lastStatusKey = key
         tvOnline.text = "● 在线"
         tvUpdated.text = "${status.optString("terminalTime").ifEmpty { "--:--" }} 更新"
         // 信息中心：同一份车况顺手做一次本地检测（未锁车、车窗、胎压、点熄火），有新异常就推通知
@@ -1062,6 +1164,9 @@ class DashboardActivity : AppCompatActivity() {
                         ControlActions.Outcome(false, it.message ?: "执行异常")
                     }
                 }
+                io.github.aw1y2z.changan.data.ControlLog.add(
+                    applicationContext, action.label, r.ok, r.message,
+                )
                 Toast.makeText(this@DashboardActivity, r.message, Toast.LENGTH_LONG).show()
                 if (r.ok) refreshStatus()
             } finally {
@@ -1085,11 +1190,33 @@ class DashboardActivity : AppCompatActivity() {
                 .show()
             return
         }
-        val saved = TokenStore.xiaoanControlPin
-        if (saved.isNotEmpty()) {
-            runXiaoanControl(cmd, saved, busyView)
+        // 控车码策略与官方一致：
+        //  - 关掉「控车码开关」→ 不校验，有本地码就用，没有才问一次；
+        //  - 开着且有预设 → 免输入直接用；
+        //  - 开着且没预设 → 弹窗要一次。
+        val proceed: () -> Unit = {
+            val saved = TokenStore.xiaoanControlPin
+            when {
+                !TokenStore.controlPinEnabled && saved.isNotEmpty() ->
+                    runXiaoanControl(cmd, saved, busyView)
+
+                saved.isNotEmpty() ->
+                    runXiaoanControl(cmd, saved, busyView)
+
+                else ->
+                    askControlPin { pin -> runXiaoanControl(cmd, pin, busyView) }
+            }
+        }
+
+        if (TokenStore.controlPinConfirm) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("确认操作")
+                .setMessage("确定要执行「${action.label}」吗？")
+                .setPositiveButton("确定") { _, _ -> proceed() }
+                .setNegativeButton("取消", null)
+                .show()
         } else {
-            askControlPin { pin -> runXiaoanControl(cmd, pin, busyView) }
+            proceed()
         }
     }
 
@@ -1152,6 +1279,7 @@ class DashboardActivity : AppCompatActivity() {
                 // 码错了别继续留着，下次重新问
                 TokenStore.xiaoanControlPin = ""
             }
+            io.github.aw1y2z.changan.data.ControlLog.add(applicationContext, cmd.label, r.ok, r.message)
             Toast.makeText(this@DashboardActivity, r.message, Toast.LENGTH_LONG).show()
             if (r.ok) waitControlResult(carId, cmd, r.taskId, r.requestId)
         }

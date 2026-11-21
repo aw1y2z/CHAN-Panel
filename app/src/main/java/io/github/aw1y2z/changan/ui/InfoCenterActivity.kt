@@ -7,9 +7,11 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import io.github.aw1y2z.changan.R
+import io.github.aw1y2z.changan.data.ChanganAuth
 import io.github.aw1y2z.changan.data.InfoCenter
 import io.github.aw1y2z.changan.data.InformationApi
 import io.github.aw1y2z.changan.data.NotifyCenter
+import io.github.aw1y2z.changan.data.TokenStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +36,9 @@ class InfoCenterActivity : AppCompatActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var content: LinearLayout
 
+    /** "" = 全部；"control" = 点火熄火；"security" = 安全守护 */
+    private var msgType: String = ""
+
     private val official = ArrayList<InformationApi.Msg>()
     private var total = 0
     private var loading = false
@@ -44,8 +49,14 @@ class InfoCenterActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_info_center)
+        msgType = intent.getStringExtra("type").orEmpty()
         content = findViewById(R.id.content)
 
+        findViewById<TextView>(R.id.tvTitle).text = when (msgType) {
+            "control" -> "点火熄火"
+            "security" -> "安全守护"
+            else -> "消息中心"
+        }
         findViewById<TextView>(R.id.btnBack).setOnClickListener { finish() }
         findViewById<TextView>(R.id.btnClear).apply {
             text = "全部已读"
@@ -76,10 +87,38 @@ class InfoCenterActivity : AppCompatActivity() {
         if (loading) return
         loading = true
         scope.launch {
-            // 服务端固定每页 200 条、不吃 displayLength，所以偏移用「已加载条数」而不是页码
+            // 服务端固定每页 200 条、不吃 displayLength，所以偏移用「已加载条数」而不是页码。
+            // 手表 1.1 的消息中心是两个数据源（APP-CONTROL / APP-SECURITY），首屏分别拉一次后合并。
             val offset = official.size
             val r = withContext(Dispatchers.IO) {
-                runCatching { InformationApi.list(offset, PAGE_SIZE) }
+                runCatching {
+                    when (msgType) {
+                        "control" -> InformationApi.list(offset, PAGE_SIZE, InformationApi.TYPE_CONTROL)
+                        "security" -> InformationApi.list(
+                            0,
+                            PAGE_SIZE,
+                            InformationApi.TYPE_SECURITY,
+                            trackUserId = securityUserId(),
+                        )
+                        else -> {
+                            val control = InformationApi.list(offset, PAGE_SIZE, InformationApi.TYPE_CONTROL)
+                            if (offset == 0) {
+                                val security = InformationApi.list(
+                                    0,
+                                    PAGE_SIZE,
+                                    InformationApi.TYPE_SECURITY,
+                                    trackUserId = securityUserId(),
+                                )
+                                InformationApi.Page(
+                                    control.total + security.total,
+                                    control.items + security.items,
+                                )
+                            } else {
+                                control
+                            }
+                        }
+                    }
+                }
             }
             r.onSuccess {
                 // 去重，避免服务端忽略偏移时插进重复项
@@ -93,6 +132,13 @@ class InfoCenterActivity : AppCompatActivity() {
             loading = false
             render()
         }
+    }
+
+    /** 安全守护的 trackUserId：getUserInfo 返回的 userId，取不到再兜底 uid */
+    private fun securityUserId(): String {
+        TokenStore.officialUserId.takeIf { it.isNotEmpty() }?.let { return it }
+        val fetched = runCatching { ChanganAuth.fetchOfficialUserId() }.getOrDefault("")
+        return fetched.ifEmpty { TokenStore.userId }
     }
 
     private fun markAllRead() {
@@ -148,11 +194,19 @@ class InfoCenterActivity : AppCompatActivity() {
             tipView("共 $total 条，已加载 ${official.size} 条" + if (unread > 0) "，未读 $unread" else ""),
         )
 
-        addGroup("点火熄火", official.filter { it.typePath.startsWith("APP-CONTROL") })
-        addGroup("智能守护", official.filter { it.typePath.startsWith("APP-GUARD") })
-        addGroup("其他", official.filter {
-            !it.typePath.startsWith("APP-CONTROL") && !it.typePath.startsWith("APP-GUARD")
-        })
+        // 与手表 1.1 的两个数据源对齐：点熄火 = APP-CONTROL，安全守护 = APP-SECURITY
+        when (msgType) {
+            "control" -> addGroup("点火熄火", official)
+            "security" -> addGroup("安全守护", official)
+            else -> {
+                addGroup("点火熄火", official.filter { it.typePath.startsWith(InformationApi.TYPE_CONTROL) })
+                addGroup("安全守护", official.filter { it.typePath.startsWith(InformationApi.TYPE_SECURITY) })
+                addGroup("其他", official.filter {
+                    !it.typePath.startsWith(InformationApi.TYPE_CONTROL) &&
+                        !it.typePath.startsWith(InformationApi.TYPE_SECURITY)
+                })
+            }
+        }
 
         if (official.size < total) {
             content.addView(loadMoreView())

@@ -28,6 +28,16 @@ object TokenStore {
         get() = prefs.getString("user_id", null) ?: ""
         set(value) = prefs.edit().putString("user_id", value).apply()
 
+    /**
+     * `/open/api/v1.0/user/getUserInfo` 返回的 `userId`。
+     *
+     * 手表 1.1 里 `UID`（OAuth token 的 uid）和 `USER_ID`（这里）是两个不同值：
+     * 点熄火消息用前者，安全守护消息用后者。为空时按 userId 兜底。
+     */
+    var officialUserId: String
+        get() = prefs.getString("official_user_id", null) ?: ""
+        set(value) = prefs.edit().putString("official_user_id", value).apply()
+
     /** /oauth/token 返回的 secret_key（Base64），VCS 签名密钥 */
     var secretKey: String
         get() = prefs.getString("secret_key", null) ?: ""
@@ -112,6 +122,18 @@ object TokenStore {
         get() = prefs.getString("xiaoan_control_pin", null) ?: ""
         set(value) = prefs.edit().putString("xiaoan_control_pin", value).apply()
 
+    // ---- 控车码管理：三项本地开关 ----
+
+    /** 控车码开关：关掉后控车不再要求输入控车码 */
+    var controlPinEnabled: Boolean
+        get() = prefs.getBoolean("control_pin_enabled", true)
+        set(value) = prefs.edit().putBoolean("control_pin_enabled", value).apply()
+
+    /** 操作二次确认：下发指令前弹窗确认（默认关闭） */
+    var controlPinConfirm: Boolean
+        get() = prefs.getBoolean("control_pin_confirm", false)
+        set(value) = prefs.edit().putBoolean("control_pin_confirm", value).apply()
+
     val hasXiaoan: Boolean get() = xiaoanToken.isNotEmpty()
 
     /** 当前车 carId（控车/车况都用它，不是 VIN） */
@@ -127,6 +149,28 @@ object TokenStore {
     var vehicleMeta: JSONObject?
         get() = prefs.getString("vehicle_meta", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
         set(value) = prefs.edit().putString("vehicle_meta", value?.toString()).apply()
+
+    /** 小程序 token 过期时间（秒级时间戳），用于进入应用时判断是否需要提前刷新 */
+    var xiaoanTokenExpireAt: Long
+        get() = prefs.getLong("xiaoan_token_expire_at", 0L)
+        set(value) = prefs.edit().putLong("xiaoan_token_expire_at", value).apply()
+
+    /** MQTT clientId 里的设备标识，首次生成后固定 */
+    var mqttDeviceUuid: String
+        get() = prefs.getString("mqtt_device_uuid", "") ?: ""
+        set(value) = prefs.edit().putString("mqtt_device_uuid", value).apply()
+
+    // ---- 控车协议：auto / open / v3 / v5 ----
+
+    /** 控车协议选择，默认自动（依次尝试直到成功） */
+    var controlProtocol: String
+        get() = prefs.getString("control_protocol", "auto") ?: "auto"
+        set(value) = prefs.edit().putString("control_protocol", value).apply()
+
+    /** 自动模式下最近一次成功的协议，下次优先尝试 */
+    var lastOkProtocol: String
+        get() = prefs.getString("control_protocol_last_ok", "") ?: ""
+        set(value) = prefs.edit().putString("control_protocol_last_ok", value).apply()
 
     val hasToken: Boolean get() = accessToken.isNotEmpty() && secretKey.isNotEmpty()
 

@@ -85,37 +85,57 @@ object ChanganClient {
     }
 
     /** POST JSON（控车指令）。body 顶层字段官方顺序：mapArgsJson, senderType, cmd, carId */
-    fun postJsonVcs(path: String, json: String): String {
+    fun postJsonVcs(path: String, json: String): String = vcsRetry {
         val headers = vcsHeaders()
         val auth = ChanganSign.vcsSign("POST", path, null, json, headers, headers["X-VCS-Timestamp"] as Long, TokenStore.secretKey)
         val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
-        return exec(Request.Builder().url(BASE_URL + path).post(body).apply {
+        exec(Request.Builder().url(BASE_URL + path).post(body).apply {
             for ((k, v) in headers) header(k, v.toString())
             header("Authorization", auth)
         })
     }
 
     /** POST Form（车况查询），签名 body 用 urlencode 表单串 */
-    fun postFormVcs(path: String, form: Map<String, Any>): String {
+    fun postFormVcs(path: String, form: Map<String, Any>): String = vcsRetry {
         val headers = vcsHeaders()
         val bodyStr = ChanganSign.formBodyForSign(form)
         val auth = ChanganSign.vcsSign("POST", path, null, bodyStr, headers, headers["X-VCS-Timestamp"] as Long, TokenStore.secretKey)
         val body = FormBody.Builder().apply { for ((k, v) in form) add(k, v.toString()) }.build()
-        return exec(Request.Builder().url(BASE_URL + path).post(body).apply {
+        exec(Request.Builder().url(BASE_URL + path).post(body).apply {
+            for ((k, v) in headers) header(k, v.toString())
+            header("Authorization", auth)
+        })
+    }
+
+    /**
+     * GET + query，额外携带 `X-VCS-Token`（与 token 同值）。
+     *
+     * 手表 1.1 的 `getCarListByBrandCode` 同时带 `X-VCS-User-Access-Token` 和 `X-VCS-Token`，
+     * 且两个头都参与签名；车况等接口只带前者。多出的头会改变签名，所以单独一个方法。
+     */
+    fun getVcsWithToken(path: String, query: Map<String, Any>): String = vcsRetry {
+        val headers = vcsHeaders()
+        headers["X-VCS-Token"] = TokenStore.accessToken
+        val auth = ChanganSign.vcsSign("GET", path, query, null, headers, headers["X-VCS-Timestamp"] as Long, TokenStore.secretKey)
+        val url = buildString {
+            append(BASE_URL).append(path).append("?")
+            append(query.entries.joinToString("&") { "${it.key}=${java.net.URLEncoder.encode(it.value.toString(), "UTF-8")}" })
+        }
+        exec(Request.Builder().url(url).get().apply {
             for ((k, v) in headers) header(k, v.toString())
             header("Authorization", auth)
         })
     }
 
     /** GET + query（控车结果轮询），query 参与签名 */
-    fun getVcs(path: String, query: Map<String, Any>): String {
+    fun getVcs(path: String, query: Map<String, Any>): String = vcsRetry {
         val headers = vcsHeaders()
         val auth = ChanganSign.vcsSign("GET", path, query, null, headers, headers["X-VCS-Timestamp"] as Long, TokenStore.secretKey)
         val url = buildString {
             append(BASE_URL).append(path).append("?")
             append(query.entries.joinToString("&") { "${it.key}=${java.net.URLEncoder.encode(it.value.toString(), "UTF-8")}" })
         }
-        return exec(Request.Builder().url(url).get().apply {
+        exec(Request.Builder().url(url).get().apply {
             for ((k, v) in headers) header(k, v.toString())
             header("Authorization", auth)
         })
@@ -127,6 +147,22 @@ object ChanganClient {
             android.util.Log.i("Changan", "HTTP ${resp.code} ${resp.request.url} -> ${bodyStr.take(600)}")
             bodyStr
         }
+
+    /** 服务端 token 失效码（手表 1.1 的 TokenRefreshInterceptor 用的就是 46000） */
+    private fun isTokenExpired(body: String): Boolean =
+        body.contains("\"code\":46000") || body.contains("\"statusCode\":46000")
+
+    /**
+     * VCS 请求的自动续期：命中 46000 就刷新 token 再重放一次。
+     *
+     * block 每次执行都会重新读 [TokenStore]，所以刷新后的新 token / secretKey 会用上。
+     */
+    private inline fun vcsRetry(crossinline block: () -> String): String {
+        val first = block()
+        if (!isTokenExpired(first) || !TokenStore.hasToken) return first
+        if (!ChanganAuth.refresh()) return first
+        return block()
+    }
 
     /**
      * 登录二维码请求特殊：响应体是 PNG 图片，qrcode_id 在响应头里，参数需带 sign。
