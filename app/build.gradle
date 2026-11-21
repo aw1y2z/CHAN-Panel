@@ -29,8 +29,8 @@ android {
         minSdk 26
         //noinspection ExpiredTargetSdkVersion
         targetSdk 34
-        versionCode 1
-        versionName "0.1.0"
+        versionCode 2
+        versionName "0.2.0"
 
         buildConfigField "String", "CHANGAN_CLIENT_ID", "\"${changanClientId}\""
         buildConfigField "String", "CHANGAN_CLIENT_SECRET", "\"${changanClientSecret}\""
