@@ -51,6 +51,11 @@
     public static ** valueOf(java.lang.String);
 }
 
+# ---------- MQTT ----------
+# Paho 内部按类名反射创建持久化与传输实现，改名后 MQTT 会在运行时初始化失败。
+-keep class org.eclipse.paho.client.mqttv3.** { *; }
+-dontwarn org.eclipse.paho.client.mqttv3.**
+
 # ---------- 说明 ----------
 # 客户端凭据（BuildConfig.CHANGAN_CLIENT_ID 等）会被内联进代码，
 # release 包反编译同样可见。客户端凭据无法真正藏住，这里不做无意义的保护，
